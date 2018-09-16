@@ -3,6 +3,17 @@ local function disp(x)
 	minetest.chat_send_all(dump(x))
 end
 
+local function to_string_readable(x)
+	local type_ = type(x)
+	if type_ == "string" then 
+		return x
+	elseif type_ == "table" then
+		return dump(x)
+	else
+		return tostring(x)
+	end
+end
+
 local function protected(pos, player)
 	local name = player:get_player_name()
 	if minetest.is_protected(pos, name) then
@@ -13,7 +24,6 @@ end
 
 -- Debug console
 -- Displays digiline messages from all channels
--- Total stored text length is limited to 1000 chars
 -- New messages added at the top of the output
 
 local function set_debug_formspec(meta, text)
@@ -36,7 +46,8 @@ minetest.register_node("digiline_io:debug", {
 	digiline = {effector = {
 		action = function(pos, _, channel, message)
 			local meta = minetest.get_meta(pos)
-			local text = (channel..": "..message:sub(1,1000).."\n"..meta:get_string("text")):sub(1,1000)
+			message = to_string_readable(message):sub(1,1000)
+			local text = (channel..": "..message.."\n"..meta:get_string("text")):sub(1,1000)
 			meta:set_string("text", text)
 			set_debug_formspec(meta, text)
 		end,
@@ -82,6 +93,7 @@ minetest.register_node("digiline_io:output", {
 
 -- Multi-line input console
 -- Text is only sent when the [send] button is clicked
+
 minetest.register_node("digiline_io:input", {
 	description = "Digiline Input",
 	tiles = {"digiline_io_input.png"},
@@ -110,20 +122,9 @@ minetest.register_node("digiline_io:input", {
 	end,
 })
 
-local function to_string_readable(x)
-	local type_ = type(x)
-	if type_ == "string" then 
-		return x
-	elseif type_ == "table" then
-		return dump(x)
-	else
-		return tostring(x)
-	end
-end
-
 -- Book printer
 -- Adds text to books/written books
--- For unwritten books, the first line of text that is sent will be the title
+-- For unwritten books, the first line of text will be the title
 -- Line breaks are added after every message
 -- Author is set to "[Printer]"
 
@@ -259,10 +260,9 @@ minetest.register_node("digiline_io:printer", {
 -- Input/output console
 -- Single line input
 -- Recieved text is added to the start of the output field (so, newest text is at the top)
--- (There is no way to set the scroll position of a textarea so I have to insert text at the top)
+-- (There is no way to set the default scroll position of a textarea)
 -- line breaks are added automatically at the end of each message.
--- \f (form feed) clears the output
--- Input is cleared when submitted
+-- "\f" (form feed) clears the output
 
 local function set_input_output_formspec(meta)
 	local swap = meta:get_int("swap")
@@ -363,6 +363,7 @@ minetest.register_node("digiline_io:storage", {
 			"field[0.5,4.5;5.5,1;request_channel;Request Channel:;${request_channel}]"..
 			"field[0.5,5.5;5.5,1;send_channel;Data Send Channel:;${send_channel}]"
 		)
+		meta:set_string("request_channel","GET")
 	end,
 	digiline = {
 		receptor = {},
@@ -387,4 +388,5 @@ minetest.register_node("digiline_io:storage", {
 	end,
 })
 
---scanner?
+-- Idea: book scanner?
+-- Todo: drop item when printer is broken
