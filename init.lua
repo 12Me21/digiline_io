@@ -30,7 +30,7 @@ function digiline_io.set_channel(pos, sender, fields, channel_name)
 	local channel = fields[channel_name]
 	if channel then
 		if protected(pos, sender) then return end
-		minetest.get_meta(pos):set_string("channel", channel)
+		minetest.get_meta(pos):set_string(channel_name, channel)
 	end
 end
 
