@@ -24,6 +24,16 @@ local function protected(pos, player)
 	end
 end
 
+-- Attempt to set channel
+-- Checks for permissions
+function digiline_io.set_channel(pos, sender, fields, channel_name)
+	local channel = fields[channel_name]
+	if channel then
+		if protected(pos, sender) then return end
+		minetest.get_meta(pos):set_string("channel", channel)
+	end
+end
+
 -- Debug console
 -- Displays digiline messages from all channels
 -- New messages added at the top of the output
@@ -48,8 +58,11 @@ minetest.register_node("digiline_io:debug", {
 	digiline = {effector = {
 		action = function(pos, _, channel, message)
 			local meta = minetest.get_meta(pos)
-			message = digiline_io.to_string(message):sub(1,1000)
-			local text = (channel..": "..message.."\n"..meta:get_string("text")):sub(1,1000)
+			local text = (
+				channel..": "..
+				digiline_io.to_string(message):sub(1,1000).."\n"..
+				meta:get_string("text")
+			):sub(1,1000)
 			meta:set_string("text", text)
 			set_debug_formspec(meta, text)
 		end,
@@ -87,9 +100,7 @@ minetest.register_node("digiline_io:output", {
 		end,
 	}},
 	on_receive_fields = function(pos, _, fields, sender)
-		if fields.channel then
-			if not protected(pos, sender) then minetest.get_meta(pos):set_string("channel", fields.channel) end
-		end
+		digiline_io.set_channel(pos, sender, fields, "channel")
 	end,
 })
 
@@ -112,10 +123,7 @@ minetest.register_node("digiline_io:input", {
 	digiline = {receptor = {}},
 	on_receive_fields = function(pos, _, fields, sender)
 		local meta = minetest.get_meta(pos)
-		if fields.channel then
-			if protected(pos, sender) then return end
-			meta:set_string("channel", fields.channel)
-		end
+		digiline_io.set_channel(pos, sender, fields, "channel")
 		if fields.send then
 			if protected(pos, sender) then return end
 			digilines.receptor_send(pos, digilines.rules.default, fields.channel, fields.text)
@@ -143,7 +151,7 @@ local function set_input_output_formspec(meta)
 		"]"..
 		"field_close_on_enter[input;false]"..
 		-- this is added/removed so that the formspec will update every time
-		(swap == 1 and "field_close_on_enter[input;false]" or "")..
+		(swap == 1 and " " or "")..
 		
 		"field[0.5,6;2.5,1;send_channel;Digiline Send Channel:;${send_channel}]"..
 		"field[3.5,6;2.5,1;recv_channel;Digiline Receive Channel:;${recv_channel}]"
@@ -181,11 +189,8 @@ minetest.register_node("digiline_io:input_output", {
 	on_receive_fields = function(pos, _, fields, sender)
 		local meta = minetest.get_meta(pos)
 		--disp(fields)
-		if fields.send_channel and fields.recv_channel then
-			if protected(pos, sender) then return end
-			meta:set_string("send_channel", fields.send_channel)
-			meta:set_string("recv_channel", fields.recv_channel)
-		end
+		digiline_io.set_channel(pos, sender, fields, "send_channel")
+		digiline_io.set_channel(pos, sender, fields, "recv_channel")
 		
 		if fields.clear then
 			if protected(pos, sender) then return end
@@ -227,7 +232,7 @@ minetest.register_node("digiline_io:storage", {
 			"field[0.5,4.5;5.5,1;request_channel;Request Channel:;${request_channel}]"..
 			"field[0.5,5.5;5.5,1;send_channel;Data Send Channel:;${send_channel}]"
 		)
-		meta:set_string("request_channel","GET")
+		meta:set_string("request_channel","GET") -- needs to be a different channel
 	end,
 	digiline = {
 		receptor = {},
@@ -242,13 +247,9 @@ minetest.register_node("digiline_io:storage", {
 		end,
 	}},
 	on_receive_fields = function(pos, _, fields, sender)
-		if protected(pos, sender) then return end
-		if fields.recv_channel and fields.send_channel and fields.request_channel then
-			local meta = minetest.get_meta(pos)
-			meta:set_string("recv_channel", fields.recv_channel)		
-			meta:set_string("request_channel", fields.request_channel)
-			meta:set_string("send_channel", fields.send_channel)
-		end
+		digiline_io.set_channel(pos, sender, fields, "recv_channel")
+		digiline_io.set_channel(pos, sender, fields, "request_channel")
+		digiline_io.set_channel(pos, sender, fields, "send_channel")
 	end,
 })
 

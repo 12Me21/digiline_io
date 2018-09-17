@@ -136,13 +136,6 @@ minetest.register_node("digiline_io:printer", {
 	end,
 	-- Formspec submit (change digiline channel)
 	on_receive_fields = function(pos, _, fields, sender)
-		if fields.channel then
-			local name = player:get_player_name()
-			if minetest.is_protected(pos, name) then
-				minetest.record_protection_violation(pos, name)
-				return 0
-			end
-			minetest.get_meta(pos):set_string("channel", fields.channel)
-		end
+		digiline_io.set_channel(pos, sender, fields, "channel")
 	end,
 })
