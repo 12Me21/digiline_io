@@ -41,7 +41,7 @@ minetest.register_node("digiline_io:debug", {
 	on_construct = function(pos)
 		local meta = minetest.get_meta(pos)
 		meta:set_string("text", "")
-		set_debug_formspec(meta,"")
+		set_debug_formspec(meta, "")
 	end,
 	digiline = {effector = {
 		action = function(pos, _, channel, message)
@@ -99,8 +99,7 @@ minetest.register_node("digiline_io:input", {
 	tiles = {"digiline_io_input.png"},
 	groups = {choppy = 3, dig_immediate = 2},
 	on_construct = function(pos)
-		local meta = minetest.get_meta(pos)
-			meta:set_string("formspec",
+		minetest.get_meta(pos):set_string("formspec",
 			"size[6,6]"..
 			default.gui_bg_img..
 			"textarea[0.5,0.25;5.5,4;text;Input:;]"..
@@ -128,7 +127,8 @@ minetest.register_node("digiline_io:input", {
 -- Line breaks are added after every message
 -- Author is set to "[Printer]"
 
-local lpp = 14 -- Lines per book's page
+-- taken from default mod
+local lines_per_page = 14
 local max_text_size = 10000
 local max_title_size = 80
 local short_title_size = 35
@@ -138,9 +138,11 @@ local function not_empty(str)
 end
 
 local function make_book_data(title, text, author)
+	-- Make short title (for item description)
 	if #title > short_title_size then
 		title = title:sub(1, short_title_size - 3) .. "..."
 	end
+	-- Count number of lines of text
 	local lines = 1
 	for _ in string.gmatch(text, "\n") do
 	   lines = lines + 1
@@ -152,7 +154,7 @@ local function make_book_data(title, text, author)
 		owner = author,
 		description = [["]]..title..[[" by ]]..author,
 		page = 1,
-		page_max = math.ceil(lines / lpp),
+		page_max = math.ceil(lines / lines_per_page),
 	}
 end
 
@@ -185,7 +187,9 @@ minetest.register_node("digiline_io:printer", {
 			"list[current_name;main;4.75,0.96;1,1;]"..
 			"field[0.5,3;5.5,1;channel;Digiline Channel:;${channel}]"..
 			"list[current_player;main;0,4.25;8,1;]"..
-			"list[current_player;main;0,5.5;8,3;8]"
+			"list[current_player;main;0,5.5;8,3;8]"..
+			"listring[current_player;main]"
+			--"listring[main;current_player]"
 		)
 	end,
 	digiline = {effector = {
@@ -270,17 +274,15 @@ local function set_input_output_formspec(meta)
 	meta:set_string("formspec",
 		"size[6,6.5]"..
 		default.gui_bg_img..
-		--not going to use gui_bg ok...
 		"field[0.5,0.5;4,1;input;Input:;]"..
 		"button[4.75,0.25;1,1;clear;CLS]"..
 		"textarea[0.5,1.5;5.5,4;output;Output: (top = new);"..
 			minetest.formspec_escape(meta:get_string("output")).. -- ${output} would not update properly here
 		"]"..
 		"field_close_on_enter[input;false]"..
-		
 		-- this is added/removed so that the formspec will update every time
 		(swap == 1 and "field_close_on_enter[input;false]" or "")..
-
+		
 		"field[0.5,6;2.5,1;send_channel;Digiline Send Channel:;${send_channel}]"..
 		"field[3.5,6;2.5,1;recv_channel;Digiline Receive Channel:;${recv_channel}]"
 	)
@@ -390,3 +392,7 @@ minetest.register_node("digiline_io:storage", {
 
 -- Idea: book scanner?
 -- Todo: drop item when printer is broken
+-- filter
+-- input digiline signal (pattern match?) or mesecon signal
+-- output: digiline signal or mesecon signal
+-- hmm
