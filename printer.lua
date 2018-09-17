@@ -1,3 +1,5 @@
+local compat_pipeworks = pipeworks or {}
+
 -- Book printer
 -- Adds text to books/written books
 -- For unwritten books, the first line of text will be the title
@@ -127,9 +129,9 @@ minetest.register_node("digiline_io:printer", {
 		input_inventory = "main",
 		connect_sides = {left = 1, right = 1, front = 1, back = 1, bottom = 1, top = 1},
 	},
-	after_place_node = pipeworks.after_place,
-	after_dig_node = pipeworks.after_dig,
-	--on_rotate = pipeworks.on_rotate,
+	after_place_node = compat_pipeworks.after_place,
+	after_dig_node = compat_pipeworks.after_dig,
+	--on_rotate = compat_pipeworks.on_rotate,
 	
 	allow_metadata_inventory_put = function(pos, listname, index, stack, player)
 		return can_insert_book(minetest.get_meta(pos):get_inventory(), listname, index, stack) and 1 or 0
