@@ -1,9 +1,11 @@
+digiline_io = {}
+
 -- Debug
 local function disp(x)
 	minetest.chat_send_all(dump(x))
 end
 
-local function to_string_readable(x)
+function digiline_io.to_string(x)
 	local type_ = type(x)
 	if type_ == "string" then 
 		return x
@@ -46,7 +48,7 @@ minetest.register_node("digiline_io:debug", {
 	digiline = {effector = {
 		action = function(pos, _, channel, message)
 			local meta = minetest.get_meta(pos)
-			message = to_string_readable(message):sub(1,1000)
+			message = digiline_io.to_string(message):sub(1,1000)
 			local text = (channel..": "..message.."\n"..meta:get_string("text")):sub(1,1000)
 			meta:set_string("text", text)
 			set_debug_formspec(meta, text)
@@ -121,146 +123,6 @@ minetest.register_node("digiline_io:input", {
 	end,
 })
 
--- Book printer
--- Adds text to books/written books
--- For unwritten books, the first line of text will be the title
--- Line breaks are added after every message
--- Author is set to "[Printer]"
-
--- taken from default mod
-local lines_per_page = 14
-local max_text_size = 10000
-local max_title_size = 80
-local short_title_size = 35
-
-local function not_empty(str)
-	return str ~= "" and str or "\r"
-end
-
-local function make_book_data(title, text, author)
-	-- Make short title (for item description)
-	if #title > short_title_size then
-		title = title:sub(1, short_title_size - 3) .. "..."
-	end
-	-- Count number of lines of text
-	local lines = 1
-	for _ in string.gmatch(text, "\n") do
-	   lines = lines + 1
-	end
-	
-	return {
-		title = not_empty(title):sub(1, max_title_size),
-		text = not_empty(text):sub(1, max_text_size),
-		owner = author,
-		description = [["]]..title..[[" by ]]..author,
-		page = 1,
-		page_max = math.ceil(lines / lines_per_page),
-	}
-end
-
-local function can_insert_book(inv, listname, index, stack)
-	if listname == "main" then
-		local name = stack:get_name()
-		if name ~= "default:book" and name ~= "default:book_written" then return false end
-		if inv:get_stack(listname, index):get_count() ~= 0 then return false end
-	end
-	return true
-end
-
-minetest.register_node("digiline_io:printer", {
-	description = "Digiline Book Printer",
-	tiles = {
-		-- Add connection textures if pipeworks is installed
-		minetest.get_modpath("pipeworks") and
-		"digiline_io_printer.png^pipeworks_tube_connection_metallic.png" or 
-		"digiline_io_printer.png"
-	},
-	groups = {choppy = 3, dig_immediate = 2, tubedevice = 1, tubedevice_receiver = 1},
-	on_construct = function(pos)
-		local meta = minetest.get_meta(pos)
-		local inv = meta:get_inventory()
-		inv:set_size("main", 1)
-		meta:set_string("formspec",
-			"size[8,8.5]"..
-			default.gui_bg_img..
-			default.gui_slots..
-			"list[current_name;main;4.75,0.96;1,1;]"..
-			"field[0.5,3;5.5,1;channel;Digiline Channel:;${channel}]"..
-			"list[current_player;main;0,4.25;8,1;]"..
-			"list[current_player;main;0,5.5;8,3;8]"..
-			"listring[current_player;main]"
-			--"listring[main;current_player]"
-		)
-	end,
-	digiline = {effector = {
-		action = function(pos, _, channel, message)
-			local node_meta = minetest.get_meta(pos)
-			if channel == node_meta:get_string("channel") then
-				message = to_string_readable(message)
-				local inv = node_meta:get_inventory()
-				local item = inv:get_stack("main", 1)
-				if item:get_count() ~= 1 then return end
-				
-				local item_name = item:get_name()
-				local item_meta = item:get_meta()
-				local title, text
-				-- New book: Set title
-				if item_name == "default:book" then
-					local line_break = message:find("\n",1,true)
-					if line_break then
-						title = message:sub(1,line_break-1)
-						text = message:sub(line_break+1)
-					else
-						title = message
-						text = ""
-					end
-					item:set_name("default:book_written")
-				-- Written book: Insert text
-				elseif item_name == "default:book_written" then
-					title = item_meta:get_string("title")
-					
-					local old_text = item_meta:get_string("text")
-					if old_text ~= "\r" then
-						text = old_text .. message .. "\n"
-					else
-						text = message
-					end
-				else
-					return
-				end
-				item_meta:from_table({fields = make_book_data(title, text, "[Printer]")})
-				inv:set_stack("main", 1, item)
-			end
-		end,
-	}},
-	tube = {
-		insert_object = function(pos, node, stack, direction)
-			minetest.get_meta(pos):get_inventory():add_item("main", stack:take_item(1))
-			return stack
-		end,
-		-- Idea: eject current book when new one is inserted
-		-- Also: send digiline signal when book is inserted?
-		can_insert = function(pos, node, stack, direction)
-			return can_insert_book(minetest.get_meta(pos):get_inventory(), "main", 1, stack)
-		end,
-		input_inventory = "main",
-		connect_sides = {left = 1, right = 1, front = 1, back = 1, bottom = 1, top = 1},
-	},
-	after_place_node = pipeworks.after_place,
-	after_dig_node = pipeworks.after_dig,
-	--on_rotate = pipeworks.on_rotate,
-	
-	allow_metadata_inventory_put = function(pos, listname, index, stack, player)
-		if protected(pos, player) then return end
-		return can_insert_book(minetest.get_meta(pos):get_inventory(), listname, index, stack) and 1 or 0
-	end,
-	on_receive_fields = function(pos, _, fields, sender)
-		if fields.channel and not protected(pos, sender) then
-			minetest.get_meta(pos):set_string("channel", fields.channel)
-		end
-	end,
-})
-
 -- Input/output console
 -- Single line input
 -- Recieved text is added to the start of the output field (so, newest text is at the top)
@@ -303,7 +165,7 @@ minetest.register_node("digiline_io:input_output", {
 			action = function(pos, _, channel, message)
 				local meta = minetest.get_meta(pos)
 				if channel == meta:get_string("recv_channel") then
-					message = to_string_readable(message)
+					message = digiline_io.to_string(message)
 					-- Form feed = clear screen
 					-- (Only checking at the start of the message)
 					if message:sub(1,1) == "\f" then
@@ -389,6 +251,8 @@ minetest.register_node("digiline_io:storage", {
 		end
 	end,
 })
+
+dofile(minetest.get_modpath("digiline_io").."/printer.lua")
 
 -- Idea: book scanner?
 -- Todo: drop item when printer is broken
