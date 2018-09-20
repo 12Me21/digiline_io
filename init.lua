@@ -1,4 +1,21 @@
-digiline_io = {}
+digiline_io = {};
+
+digiline_io.full_rules = {
+	{x= 0, y=-1, z= 0}, -- down
+	{x= 0, y= 1, z= 0}, -- up
+	{x= 1, y= 0, z= 0}, -- sideways
+	{x=-1 ,y= 0, z= 0}, --
+	{x= 0, y= 0, z= 1}, --
+	{x= 0, y= 0, z=-1}, --
+	{x= 1, y=-1, z= 0}, -- sideways + down
+	{x=-1 ,y=-1, z= 0}, --
+	{x= 0, y=-1, z= 1}, --
+	{x= 0, y=-1, z=-1}, --
+	{x= 1, y= 1, z= 0}, -- sideways + up
+	{x=-1 ,y= 1, z= 0}, --
+	{x= 0, y= 1, z= 1}, --
+	{x= 0, y= 1, z=-1}, --
+}
 
 -- Debug
 local function disp(x)
@@ -16,7 +33,47 @@ function digiline_io.to_string(x)
 	end
 end
 
-local function protected(pos, player)
+function digiline_io.after_dig_drop_contents(pos, old_node, old_meta_table, player)
+	if old_meta_table.inventory then
+		for _, list in pairs(old_meta_table.inventory) do
+			for _, stack in ipairs(list) do
+				if not stack:is_empty() then minetest.add_item(pos, stack) end
+			end
+		end
+	end
+end
+
+-- true = player tried to modify formspec without permission
+-- false = player modified formspec with permission
+-- nil = formspec exited without changes
+function digiline_io.protect_formspec(pos, player, fields)
+	for i in pairs(fields) do
+		if i ~= "quit" then
+			local name = player:get_player_name()
+			if minetest.is_protected(pos, name) then
+				minetest.record_protection_violation(pos, name)
+				return true
+			end
+			return false
+		end
+	end
+end
+
+function digiline_io.checkbox(fields, meta, name)
+	local value = fields[name]
+	if value then
+		meta:set_int(name, value=="true" and 1 or 0)
+	end
+end
+
+function digiline_io.field(fields, meta, name)
+	local value = fields[name]
+	if value then
+		meta:set_string(name, value)
+	end
+end
+
+function digiline_io.protected(pos, player)
 	local name = player:get_player_name()
 	if minetest.is_protected(pos, name) then
 		minetest.record_protection_violation(pos, name)
@@ -29,107 +86,10 @@ end
 function digiline_io.set_channel(pos, sender, fields, channel_name)
 	local channel = fields[channel_name]
 	if channel then
-		if protected(pos, sender) then return end
+		if digiline_io.protected(pos, sender) then return end
 		minetest.get_meta(pos):set_string(channel_name, channel)
 	end
 end
-
--- Debug console
--- Displays digiline messages from all channels
--- New messages added at the top of the output
-
-local function set_debug_formspec(meta, text)
-	meta:set_string("formspec",
-		"size[6,3.75]"..
-		default.gui_bg_img..
-		"textarea[0.5,0.25;5.5,4;_;Digiline Events (All Channels) (top = new);"..minetest.formspec_escape(text).."]"
-	)
-end
-
-minetest.register_node("digiline_io:debug", {
-	description = "Digiline Debugger",
-	tiles = {"digiline_io_debug.png"},
-	groups = {choppy = 3, dig_immediate = 2},
-	on_construct = function(pos)
-		local meta = minetest.get_meta(pos)
-		meta:set_string("text", "")
-		set_debug_formspec(meta, "")
-	end,
-	digiline = {effector = {
-		action = function(pos, _, channel, message)
-			local meta = minetest.get_meta(pos)
-			local text = (
-				channel..": "..
-				digiline_io.to_string(message):sub(1,1000).."\n"..
-				meta:get_string("text")
-			):sub(1,1000)
-			meta:set_string("text", text)
-			set_debug_formspec(meta, text)
-		end,
-	}},
-})
-
--- Text output console
--- Displays only the last message it recieved.
-
-local function set_output_formspec(meta, text)
-	meta:set_string("formspec",
-		"size[6,5]"..
-		default.gui_bg_img..
-		"textarea[0.5,0.25;5.5,4;_;Output:;"..minetest.formspec_escape(text).."]"..
-		"field[0.5,4.5;5.5,1;channel;Digiline Channel:;${channel}]"
-	)
-end
-
-minetest.register_node("digiline_io:output", {
-	description = "Digiline Output",
-	tiles = {"digiline_io_output.png"},
-	groups = {choppy = 3, dig_immediate = 2},
-	on_construct = function(pos)
-		local meta = minetest.get_meta(pos)
-		meta:set_string("text", "")
-		set_output_formspec(meta, "")
-	end,
-	digiline = {effector = {
-		action = function(pos, _, channel, message)
-			local meta = minetest.get_meta(pos)
-			if channel == meta:get_string("channel") then
-				meta:set_string("text",message)
-				set_output_formspec(meta, message)
-			end
-		end,
-	}},
-	on_receive_fields = function(pos, _, fields, sender)
-		digiline_io.set_channel(pos, sender, fields, "channel")
-	end,
-})
-
--- Multi-line input console
--- Text is only sent when the [send] button is clicked
-
-minetest.register_node("digiline_io:input", {
-	description = "Digiline Input",
-	tiles = {"digiline_io_input.png"},
-	groups = {choppy = 3, dig_immediate = 2},
-	on_construct = function(pos)
-		minetest.get_meta(pos):set_string("formspec",
-			"size[6,6]"..
-			default.gui_bg_img..
-			"textarea[0.5,0.25;5.5,4;text;Input:;]"..
-			"button_exit[0.25,4;5.5,1;send;Send]"..
-			"field[0.5,5.5;5.5,1;channel;Digiline Channel:;${channel}]"
-		)
-	end,
-	digiline = {receptor = {}},
-	on_receive_fields = function(pos, _, fields, sender)
-		local meta = minetest.get_meta(pos)
-		digiline_io.set_channel(pos, sender, fields, "channel")
-		if fields.send then
-			if protected(pos, sender) then return end
-			digilines.receptor_send(pos, digilines.rules.default, fields.channel, fields.text)
-		end
-	end,
-})
 
 -- Input/output console
 -- Single line input
@@ -159,23 +119,68 @@ local function set_input_output_formspec(meta)
 	meta:set_int("swap", 1 - swap)
 end
 
-minetest.register_node("digiline_io:input_output", {
-	description = "Digiline Input/Output",
-	tiles = {"digiline_io_input_output.png"},
+local terminal_rules = {
+	{x= 0, y=-1, z= 0}, -- down
+	{x= 1, y= 0, z= 0}, -- sideways
+	{x=-1 ,y= 0, z= 0}, --
+	{x= 0, y= 0, z= 1}, --
+	{x= 0, y= 0, z=-1}, --
+	{x= 1, y=-1, z= 0}, -- sideways + down
+	{x=-1 ,y=-1, z= 0}, --
+	{x= 0, y=-1, z= 1}, --
+	{x= 0, y=-1, z=-1}, --
+}
+
+minetest.register_node("digiline_io:terminal", {
+	description = "Digiline Terminal",
+	paramtype = "light",
+	paramtype2 = "facedir",
+	drawtype = "nodebox",
+	node_box = {
+		type = "fixed",
+		fixed = {
+			{-7/16, -8/16, -7/16,  7/16,  -7/16, -1/16}, -- Keyboard
+			{-6/16, -8/16, -6/16,  6/16,-6.5/16, -2/16}, -- Keys
+			{-5/16, -8/16,0.5/16,  5/16,   3/16,  8/16}, -- Screen
+			{-5/16,  2/16,  0/16,  5/16,   3/16,0.5/16}, -- Screen_Top
+			{-5/16, -8/16,  0/16,  5/16,  -6/16,0.5/16}, -- Screen_Bottom
+			{-6/16, -8/16,  0/16, -5/16,   3/16,  8/16}, -- Screen_Left
+			{ 5/16, -8/16,  0/16,  6/16,   3/16,  8/16}, -- Screen_Right
+		}
+	},
+	selection_box = {
+		type = "fixed",
+		fixed = {
+			{-7/16, -8/16, -7/16, 7/16,-6.5/16, -1/16}, -- Keyboard
+			{-6/16, -8/16,  0/16, 6/16,   3/16,  8/16}, -- Screen
+		}
+		
+	},
+	
+	tiles = {
+		"digiline_io_terminal_top.png", "digiline_io_terminal_bottom.png",
+		"digiline_io_terminal_side.png^[transformFX", "digiline_io_terminal_side.png",
+		"digiline_io_terminal_back.png", "digiline_io_terminal_front.png",
+	},
+	
 	groups = {choppy = 3, dig_immediate = 2},
 	on_construct = function(pos)
-		set_input_output_formspec(minetest.get_meta(pos))
+		local meta = minetest.get_meta(pos)
+		set_input_output_formspec(meta)
+		meta:set_string("infotext","Digiline Terminal")
 	end,
 	
 	digiline = {
-		receptor = {},
+		receptor = {
+			rules = terminal_rules;
+		},
 		effector = {
 			action = function(pos, _, channel, message)
 				local meta = minetest.get_meta(pos)
 				if channel == meta:get_string("recv_channel") then
 					message = digiline_io.to_string(message)
 					-- Form feed = clear screen
-					-- (Only checking at the start of the message)
+					-- (Only checking at the start of the message) (Because why would you clear the screen instantly after displaying part of a message?)s
 					if message:sub(1,1) == "\f" then
 						meta:set_string("output", message:sub(2, 1001))
 					else
@@ -184,80 +189,31 @@ minetest.register_node("digiline_io:input_output", {
 					set_input_output_formspec(meta)
 				end
 			end,
+			rules = terminal_rules;
 		},
 	},
 	on_receive_fields = function(pos, _, fields, sender)
+		if digiline_io.protect_formspec(pos, sender, fields) then return end
+		
 		local meta = minetest.get_meta(pos)
-		--disp(fields)
-		digiline_io.set_channel(pos, sender, fields, "send_channel")
-		digiline_io.set_channel(pos, sender, fields, "recv_channel")
+		
+		digiline_io.field(fields, meta, "send_channel")
+		digiline_io.field(fields, meta, "recv_channel")
 		
 		if fields.clear then
-			if protected(pos, sender) then return end
 			meta:set_string("output", "")
 			set_input_output_formspec(meta)
 		end
 		
 		if fields.key_enter_field == "input" then
-			if protected(pos, sender) then return end
 			set_input_output_formspec(meta)
-			digilines.receptor_send(pos, digilines.rules.default, fields.send_channel, fields.input)
+			digilines.receptor_send(pos, terminal_rules, fields.send_channel, fields.input)
 		end
 	end,
 })
 
--- Data storage
--- This device uses THREE(!) digiline channels:
--- Receive: This is where you send data TO the device, to be saved
--- Request: Stored data will be sent when any message is recieved on this channel (instead of the "GET" message used by other devices)
--- Send: Data is sent out through this channel
-
--- The reason for this is so there isn't 1 value (like "GET") that can't be stored.
--- and other reasons
-
--- Idea: maybe add send button and split channel input boxes into 2 rows?
-
-minetest.register_node("digiline_io:storage", {
-	description = "Digiline Data Storage",
-	tiles = {"digiline_io_data_storage.png"},
-	groups = {choppy = 3, dig_immediate = 2},
-	on_construct = function(pos)
-		local meta = minetest.get_meta(pos)
-		meta:set_string("data", minetest.serialize(nil))
-		meta:set_string("formspec",
-			"size[6,6]"..
-			default.gui_bg_img..
-			"textarea[0.5,0.25;5.5,3;_;Data: (cannot be edited from this menu);${data}]"..
-			"field[0.5,3.5;5.5,1;recv_channel;Data Receive Channel:;${recv_channel}]"..
-			"field[0.5,4.5;5.5,1;request_channel;Request Channel:;${request_channel}]"..
-			"field[0.5,5.5;5.5,1;send_channel;Data Send Channel:;${send_channel}]"
-		)
-		meta:set_string("request_channel","GET") -- needs to be a different channel
-	end,
-	digiline = {
-		receptor = {},
-		effector = {
-		action = function(pos, _, channel, message)
-			local meta = minetest.get_meta(pos)
-			if channel == meta:get_string("request_channel") then
-				digilines.receptor_send(pos, digilines.rules.default, meta:get_string("send_channel"), minetest.deserialize(meta:get_string("data")))
-			elseif channel == meta:get_string("recv_channel") then
-				meta:set_string("data", minetest.serialize(message))
-			end
-		end,
-	}},
-	on_receive_fields = function(pos, _, fields, sender)
-		digiline_io.set_channel(pos, sender, fields, "recv_channel")
-		digiline_io.set_channel(pos, sender, fields, "request_channel")
-		digiline_io.set_channel(pos, sender, fields, "send_channel")
-	end,
-})
-
 dofile(minetest.get_modpath("digiline_io").."/printer.lua")
+dofile(minetest.get_modpath("digiline_io").."/lcd.lua")
+dofile(minetest.get_modpath("digiline_io").."/controller.lua")
 
 -- Idea: book scanner?
--- Todo: drop item when printer is broken
--- filter
--- input digiline signal (pattern match?) or mesecon signal
--- output: digiline signal or mesecon signal
--- hmm
