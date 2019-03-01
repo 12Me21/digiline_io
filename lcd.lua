@@ -51,7 +51,7 @@ local function wrap_text(text, columns, rows)
 		else
 			x = x + 1
 		end
-		
+
 		return x, y, i
 	end
 end
@@ -62,7 +62,7 @@ local function generate_texture(text, columns, rows)
 	for x, y, i in wrap_text(text, columns, rows) do
 		print(x,y)
 		local char = text:byte(i)
-		if char >= 33 and char <= 127 then -- printable ASCII (except space) and \127 
+		if char >= 33 and char <= 127 then -- printable ASCII (except space) and \127
 			-- :<x>,<y>=lcd_.png\^[sheet\:96x1\:<char>,0
 			-- (those are real backslashes in the string)
 			texture = texture..":"..
@@ -119,7 +119,7 @@ end
 
 minetest.register_node("digiline_io:lcd", {
 	description = "Digiline LCD",
-	
+
 	-- Textures
 	tiles = {
 		"digiline_io_lcd_sides.png","digiline_io_lcd_sides.png",
@@ -128,12 +128,12 @@ minetest.register_node("digiline_io:lcd", {
 	},
 	inventory_image = "digiline_io_lcd_item.png",
 	wield_image = "digiline_io_lcd_item.png",
-	
+
 	-- Light
 	paramtype = "light",
 	sunlight_propagates = true,
 	light_source = 6,
-	
+
 	-- Nodebox
 	paramtype2 = "facedir",
 	drawtype = "nodebox",
@@ -143,9 +143,9 @@ minetest.register_node("digiline_io:lcd", {
 			{-8/16, -8/16, 6/16, 8/16, 8/16, 8/16},
 		}
 	},
-	
+
 	groups = {choppy = 3, dig_immediate = 2, display_modpack_node = 1},
-	
+
 	-- Display lib
 	display_entities = {
 		["digiline_io:text"] = {
@@ -166,13 +166,13 @@ minetest.register_node("digiline_io:lcd", {
 		display_lib.on_construct(pos)
 	end,
 	on_destruct = display_lib.on_destruct,
-	
+
 	-- Formspec
 	on_receive_fields = function(pos, _, fields, sender)
 		if digiline_io.protect_formspec(pos, sender, fields) then return end
-		digiline_io.field(fields, meta, "channel")
+		digiline_io.field(fields, minetest.get_meta(pos), "channel")
 	end,
-	
+
 	-- Digilines
 	digiline = {effector = {
 		action = lcd_receive,

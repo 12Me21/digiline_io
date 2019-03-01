@@ -30,7 +30,7 @@ local function make_book_data(title, text, author)
 	for _ in string.gmatch(text, "\n") do
 		lines = lines + 1
 	end
-	
+
 	return {
 		title = not_empty(title):sub(1, max_title_size),
 		text = not_empty(text):sub(1, max_text_size),
@@ -56,7 +56,7 @@ minetest.register_node("digiline_io:printer", {
 	tiles = {
 		-- Add connection textures if pipeworks is installed
 		minetest.get_modpath("pipeworks") and
-		"digiline_io_printer.png^pipeworks_tube_connection_metallic.png" or 
+		"digiline_io_printer.png^pipeworks_tube_connection_metallic.png" or
 		"digiline_io_printer.png"
 	},
 	groups = {choppy = 3, dig_immediate = 2, tubedevice = 1, tubedevice_receiver = 1},
@@ -87,7 +87,7 @@ minetest.register_node("digiline_io:printer", {
 				local inv = node_meta:get_inventory()
 				local item = inv:get_stack("main", 1)
 				if item:get_count() ~= 1 then return end
-				
+
 				local item_name = item:get_name()
 				local item_meta = item:get_meta()
 				local title, text
@@ -105,7 +105,7 @@ minetest.register_node("digiline_io:printer", {
 				-- Written book: Insert text
 				elseif item_name == "default:book_written" then
 					title = item_meta:get_string("title")
-					
+
 					local old_text = item_meta:get_string("text")
 					if old_text ~= "\f" then
 						text = old_text .. message .. "\n"
@@ -133,20 +133,20 @@ minetest.register_node("digiline_io:printer", {
 		input_inventory = "main",
 		connect_sides = {left = 1, right = 1, front = 1, back = 1, bottom = 1, top = 1},
 	},
-	
+
 	after_place_node = compat_pipeworks.after_place,
 	after_dig_node = function(pos, old_node, old_meta_table, player)
 		digiline_io.after_dig_drop_contents(pos, old_node, old_meta_table, player)
 		if compat_pipeworks.after_dig then compat_pipeworks.after_dig(pos, old_node, old_meta_table, player) end
 	end,
 	--on_rotate = compat_pipeworks.on_rotate,
-	
+
 	allow_metadata_inventory_put = function(pos, listname, index, stack, player)
 		return can_insert_book(minetest.get_meta(pos):get_inventory(), listname, index, stack) and 1 or 0
 	end,
 	-- Formspec submit (change digiline channel)
 	on_receive_fields = function(pos, _, fields, sender)
 		if digiline_io.protect_formspec(pos, sender, fields) then return end
-		digiline_io.field(fields, meta, "channel")
+		digiline_io.field(fields, minetest.get_meta(pos), "channel")
 	end,
 })
