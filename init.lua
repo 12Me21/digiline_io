@@ -73,6 +73,14 @@ function digiline_io.field(fields, meta, name)
 	end
 end
 
+-- Dropdowns are dumb and return the option's NAME rather than the index, which is not only annoying to handle, but also gets changed a lot...
+function digiline_io.dropdown(fields, meta, name, options)
+	local value = fields[name]
+	if value then
+		meta:set_int(name, options[value] or 1)
+	end
+end
+
 function digiline_io.protected(pos, player)
 	local name = player:get_player_name()
 	if minetest.is_protected(pos, name) then

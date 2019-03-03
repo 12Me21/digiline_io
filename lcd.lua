@@ -170,7 +170,7 @@ minetest.register_node("digiline_io:lcd", {
 	-- Formspec
 	on_receive_fields = function(pos, _, fields, sender)
 		if digiline_io.protect_formspec(pos, sender, fields) then return end
-		digiline_io.field(fields, meta, "channel")
+		digiline_io.field(fields, minetest.get_meta(pos), "channel")
 	end,
 	
 	-- Digilines
